@@ -9,7 +9,8 @@ const global = struct {
 };
 
 fn rand_mod(comptime T: type, max: T) T {
-    return @intCast(@mod(@as(T, @intCast(global.rand.next())), @as(T, @intCast(max))));
+    log("max: {}", .{max});
+    return @intCast(@mod(@as(T, @as(T, @truncate(global.rand.next()))), @as(T, @intCast(max))));
 }
 
 export fn start() void {
@@ -29,7 +30,7 @@ const lines = &[_][]const u8{
 const spacing = (cart.font_height * 4 / 3);
 
 var ticks: u8 = 0;
-
+var flash = false;
 fn scene_intro() void {
     set_background();
 
@@ -76,12 +77,40 @@ var thingies: [100]Thingy = [_]Thingy{.{}} ** 100;
 
 var control_cooldown: bool = false;
 var tick: u32 = 0;
+fn log(comptime fmt: []const u8, args: anytype) void {
+    if (!builtin.target.isWasm()) return;
+    var buf: [300]u8 = undefined;
+    const str = std.fmt.bufPrint(&buf, fmt, args) catch @panic("codebug");
+    cart.trace(str);
+}
+
+pub fn panic(
+    msg: []const u8,
+    trace: ?*std.builtin.StackTrace,
+    ret_addr: ?usize,
+) noreturn {
+    log("panic: {s}", .{msg});
+    if (trace) |t| {
+        cart.trace("dumping error trace...");
+        _ = t;
+        //std.debug.dumpStackTrace(t.*);
+    } else {
+        cart.trace("no error trace");
+    }
+    cart.trace("dumping current stack...");
+    _ = ret_addr;
+    //std.debug.dumpCurrentStackTrace(ret_addr);
+    cart.trace("breakpoint");
+    while (true) {
+        @breakpoint();
+    }
+}
 
 fn spawn(t: Thingy) void {
     // Spawn sparkles
+    flash = true;
     var phi: f32 = 0.0;
     var sparkles_done: u32 = 0;
-    // const num_sparkles = 0;
     const num_sparkles = 10 + rand_mod(u32, 6);
 
     for (&thingies) |*sparkle| {
@@ -99,7 +128,7 @@ fn spawn(t: Thingy) void {
             sparkle.y = t.y;
             sparkle.v_x = @intFromFloat(5 * @sin(phi));
             sparkle.v_y = @intFromFloat(5 * @cos(phi));
-            sparkle.ticks_to_live = 12 + rand_mod(i8, 12);
+            sparkle.ticks_to_live = 6 + @as(i8, @intCast(rand_mod(u32, 12)));
         }
     }
 }
@@ -111,23 +140,27 @@ fn end(t: *Thingy) void {
     }
 }
 
+const margin = 5;
+
 fn launch() void {
     for (&thingies) |*thingy| {
         if (!thingy.live) {
             thingy.live = true;
             thingy.is_rocket = true;
             thingy.color = .{ .r = @intCast(31 / 4 + rand_mod(u5, 3 * 31 / 4)), .g = @intCast(63 / 4 + rand_mod(u6, 3 * 63 / 4)), .b = @intCast(31 / 4 + rand_mod(u5, 3 * 31 / 4)) };
-            thingy.x = rand_mod(u8, cart.screen_width);
-            thingy.y = @as(u8, @intCast(cart.screen_height / 2)) + rand_mod(u8, cart.screen_height / 2);
-            thingy.v_x = @intCast(rand_mod(u8, 8) - 4);
-            thingy.v_y = @intCast(-10 - @as(i7, @intCast(rand_mod(u8, 3))));
-            thingy.ticks_to_live = 15 + rand_mod(i8, 20);
+            thingy.x = margin + rand_mod(u8, cart.screen_width - margin);
+            thingy.y = margin + @as(u8, @intCast(cart.screen_height / 2)) + rand_mod(u8, cart.screen_height / 2 - margin);
+            thingy.v_x = @as(i7, @intCast(rand_mod(u8, 8))) - 4;
+            thingy.v_y = -10 - @as(i7, @intCast(rand_mod(u8, 3)));
+            thingy.ticks_to_live = @as(i8, @intCast(30 + rand_mod(u8, 20)));
             break;
         }
     }
 }
 
 fn scene_game() void {
+    log("start", .{});
+    flash = false;
     tick += 1;
     set_background();
 
@@ -146,6 +179,7 @@ fn scene_game() void {
         .y = 40,
     });
 
+    log("kill expired", .{});
     // Kill expired thingies
     for (&thingies) |*thingy| {
         if (thingy.live) {
@@ -154,21 +188,26 @@ fn scene_game() void {
                 end(thingy);
                 continue;
             }
-            const margin = 10;
             if (!builtin.target.isWasm() or tick % 2 == 0) {
-                thingy.x = @intCast(@as(i16, @intCast(thingy.x)) +| thingy.v_x);
-                thingy.y = @intCast(@as(i16, @intCast(thingy.y)) +| thingy.v_y);
-                if ((thingy.x < margin or thingy.x > cart.screen_width - margin or thingy.y < margin or thingy.y > cart.screen_height - margin)) {
-                    end(thingy);
-                }
+                log("speed", .{});
+                const tmp_x = @as(i32, @intCast(thingy.x)) +| thingy.v_x;
+                const tmp_y = @as(i32, @intCast(thingy.y)) +| thingy.v_y;
+                log("g", .{});
                 const g = 1;
                 if (thingy.is_rocket) {
                     thingy.v_y += g;
                 }
+                if ((tmp_x < margin or tmp_x > cart.screen_width - margin or tmp_y < margin or tmp_y > cart.screen_height - margin)) {
+                    end(thingy);
+                    continue;
+                }
+                thingy.x = @intCast(tmp_x);
+                thingy.y = @intCast(tmp_y);
             }
         }
     }
 
+    log("draw", .{});
     for (thingies) |thingy| {
         if (thingy.live) {
             const size: u32 = if (thingy.is_rocket) 5 else 1;
@@ -183,24 +222,35 @@ fn scene_game() void {
         }
     }
 
-    const improbability = 5;
+    const improbability = 10;
     if (tick % improbability == rand_mod(u32, improbability)) {
         launch();
     }
-    if (!control_cooldown) {
-        if (cart.controls.select) {
-            launch();
-        }
-        if (cart.controls.left) {
-            scene = switch (scene) {
-                .intro => .game,
-                .game => .intro,
-            };
-        }
-    }
+    // if (!control_cooldown) {
+    //     if (cart.controls.select) {
+    //         launch();
+    //     }
+    //     if (cart.controls.left) {
+    //         scene = switch (scene) {
+    //             .intro => .game,
+    //             .game => .intro,
+    //         };
+    //     }
+    // }
 
-    control_cooldown = false;
-    if (cart.controls.left or cart.controls.right or cart.controls.up or cart.controls.down or cart.controls.select) control_cooldown = true;
+    // control_cooldown = false;
+    // if (cart.controls.left or cart.controls.right or cart.controls.up or cart.controls.down or cart.controls.select) control_cooldown = true;
+    // const dark = 16;
+    @memset(cart.neopixels, if (flash) .{
+        .r = 1,
+        .g = 2,
+        .b = 1,
+    } else .{
+        .r = 0,
+        .g = 0,
+        .b = 0,
+    });
+    log("end", .{});
 }
 
 fn set_background() void {
