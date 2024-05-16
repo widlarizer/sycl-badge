@@ -164,21 +164,6 @@ fn scene_game() void {
     tick += 1;
     set_background();
 
-    const title = "EMIL";
-    const subtitle = "(widlarizer)";
-    cart.text(.{
-        .text_color = .{ .r = 31, .g = 63, .b = 31 },
-        .str = title,
-        .x = @intCast((cart.screen_width - cart.font_width * title.len) / 2),
-        .y = 20,
-    });
-    cart.text(.{
-        .text_color = .{ .r = 31, .g = 63, .b = 31 },
-        .str = subtitle,
-        .x = @intCast((cart.screen_width - cart.font_width * subtitle.len) / 2),
-        .y = 40,
-    });
-
     log("kill expired", .{});
     // Kill expired thingies
     for (&thingies) |*thingy| {
@@ -238,12 +223,18 @@ fn scene_game() void {
 }
 
 fn set_background() void {
-    const ratio = 0;
-    // const ratio = (4095 - @as(f32, @floatFromInt(cart.light_level.*))) / 4095 * 0.2;
-
-    @memset(cart.framebuffer, cart.DisplayColor{
-        .r = @intFromFloat(ratio * 31),
-        .g = @intFromFloat(ratio * 63),
-        .b = @intFromFloat(ratio * 31),
-    });
+    const foo = @embedFile("foo.bmp");
+    var idx: u32 = 0x36; // bmp header
+    for (0..cart.screen_height) |y| {
+        for (0..cart.screen_width) |x| {
+            cart.rect(.{
+                .fill_color = if (foo[idx] == 0) .{ .r = 10, .g = 20, .b = 30 } else .{ .r = 0, .g = 0, .b = 0 },
+                .x = @intCast(x),
+                .y = @intCast(cart.screen_height - y),
+                .width = 2,
+                .height = 2,
+            });
+            idx += 3;
+        }
+    }
 }
