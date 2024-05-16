@@ -9,6 +9,10 @@ const global = struct {
     pub var rand: std.rand.DefaultPrng = undefined;
 };
 
+fn rand(comptime T: type) T {
+    return @as(T, @truncate(global.rand.next()));
+}
+
 fn rand_mod(comptime T: type, max: T) T {
     return @intCast(@mod(@as(T, @as(T, @truncate(global.rand.next()))), @as(T, @intCast(max))));
 }
@@ -146,7 +150,13 @@ fn launch() void {
         if (!thingy.live) {
             thingy.live = true;
             thingy.is_rocket = true;
-            thingy.color = .{ .r = @intCast(31 / 4 + rand_mod(u5, 3 * 31 / 4)), .g = @intCast(63 / 4 + rand_mod(u6, 3 * 63 / 4)), .b = @intCast(31 / 4 + rand_mod(u5, 3 * 31 / 4)) };
+            const r: u8 = rand(u8);
+            // log("r {}", .{r});
+            const g: u8 = rand_mod(u8, @intCast(@min(255, 512 - @as(u32, r))));
+            // log("g {}", .{g});
+            const b: u8 = @intCast(@min(255, 512 - @as(u32, r) - @as(u32, g)));
+            // log("b {}", .{b});
+            thingy.color = .{ .r = @intCast(r >> 3), .g = @intCast(g >> 2), .b = @intCast(b >> 3) };
             thingy.x = margin + rand_mod(u8, cart.screen_width - margin);
             thingy.y = margin + @as(u8, @intCast(cart.screen_height / 2)) + rand_mod(u8, cart.screen_height / 2 - margin);
             thingy.v_x = @as(i7, @intCast(rand_mod(u8, 8))) - 4;
@@ -222,8 +232,6 @@ fn scene_game() void {
 }
 
 fn noodle(x: u32, y: u32, len: u32, state: bool) void {
-    if (y == 0)
-        log("noodle {},{} {}", .{ x, y, len });
     if (!state) cart.rect(.{
         .fill_color = .{ .r = 0, .g = 0, .b = 0 },
         .x = @intCast(x),
