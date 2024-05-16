@@ -152,7 +152,7 @@ fn launch() void {
             thingy.y = margin + @as(u8, @intCast(cart.screen_height / 2)) + rand_mod(u8, cart.screen_height / 2 - margin);
             thingy.v_x = @as(i7, @intCast(rand_mod(u8, 8))) - 4;
             thingy.v_y = -10 - @as(i7, @intCast(rand_mod(u8, 3)));
-            thingy.ticks_to_live = @as(i8, @intCast(30 + rand_mod(u8, 20)));
+            thingy.ticks_to_live = @as(i8, @intCast(10 + rand_mod(u8, 20)));
             break;
         }
     }
@@ -210,10 +210,9 @@ fn scene_game() void {
     log("draw", .{});
     for (thingies) |thingy| {
         if (thingy.live) {
-            const size: u32 = if (thingy.is_rocket) 5 else 1;
+            const size: u32 = if (thingy.is_rocket) 5 else 2;
             cart.rect(.{
-                .stroke_color = thingy.color,
-                // .fill_color = color,
+                .fill_color = thingy.color,
                 .x = thingy.x,
                 .y = thingy.y,
                 .width = size,
@@ -226,25 +225,10 @@ fn scene_game() void {
     if (tick % improbability == rand_mod(u32, improbability)) {
         launch();
     }
-    // if (!control_cooldown) {
-    //     if (cart.controls.select) {
-    //         launch();
-    //     }
-    //     if (cart.controls.left) {
-    //         scene = switch (scene) {
-    //             .intro => .game,
-    //             .game => .intro,
-    //         };
-    //     }
-    // }
-
-    // control_cooldown = false;
-    // if (cart.controls.left or cart.controls.right or cart.controls.up or cart.controls.down or cart.controls.select) control_cooldown = true;
-    // const dark = 16;
     @memset(cart.neopixels, if (flash) .{
-        .r = 1,
-        .g = 2,
-        .b = 1,
+        .r = 4,
+        .g = 1,
+        .b = 4,
     } else .{
         .r = 0,
         .g = 0,
