@@ -76,11 +76,18 @@ pub fn build(b: *Build) void {
             .root_source_file = .{ .path = "samples/blobs/blobs.zig" },
         });
         cart.install(b);
-        b.step("watch-blobs", "Watch/run blobs in the simulator").dependOn(
-            &cart.install_with_watcher(&dep, b, .{}).step
-        );
+        b.step("watch-blobs", "Watch/run blobs in the simulator").dependOn(&cart.install_with_watcher(&dep, b, .{}).step);
     }
 
+    {
+        const cart = add_cart(&dep, b, .{
+            .name = "fireworks",
+            .optimize = .ReleaseSmall,
+            .root_source_file = .{ .path = "samples/blobs/fireworks.zig" },
+        });
+        cart.install(b);
+        b.step("watch-fireworks", "Watch/run fireworks in the simulator").dependOn(&cart.install_with_watcher(&dep, b, .{}).step);
+    }
 
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&watch_run_step.step);
