@@ -10,7 +10,6 @@ const global = struct {
 };
 
 fn rand_mod(comptime T: type, max: T) T {
-    log("max: {}", .{max});
     return @intCast(@mod(@as(T, @as(T, @truncate(global.rand.next()))), @as(T, @intCast(max))));
 }
 
@@ -140,7 +139,7 @@ fn end(t: *Thingy) void {
     }
 }
 
-const margin = 5;
+const margin = 0;
 
 fn launch() void {
     for (&thingies) |*thingy| {
@@ -159,12 +158,10 @@ fn launch() void {
 }
 
 fn scene_game() void {
-    log("start", .{});
     flash = false;
     tick += 1;
     set_background();
 
-    log("kill expired", .{});
     // Kill expired thingies
     for (&thingies) |*thingy| {
         if (thingy.live) {
@@ -174,10 +171,8 @@ fn scene_game() void {
                 continue;
             }
             if (!builtin.target.isWasm() or tick % 2 == 0) {
-                log("speed", .{});
                 const tmp_x = @as(i32, @intCast(thingy.x)) +| thingy.v_x;
                 const tmp_y = @as(i32, @intCast(thingy.y)) +| thingy.v_y;
-                log("g", .{});
                 const g = 1;
                 if (thingy.is_rocket) {
                     thingy.v_y += g;
@@ -192,7 +187,6 @@ fn scene_game() void {
         }
     }
 
-    log("draw", .{});
     for (thingies) |thingy| {
         if (thingy.live) {
             const size: u32 = if (thingy.is_rocket) 5 else 3;
@@ -211,9 +205,9 @@ fn scene_game() void {
         launch();
     }
     @memset(cart.neopixels, if (flash) .{
-        .r = 4,
-        .g = 1,
-        .b = 4,
+        .r = 0,
+        .g = 0,
+        .b = 1,
     } else .{
         .r = 0,
         .g = 0,
@@ -225,7 +219,18 @@ fn scene_game() void {
     };
 
     prev_start = cart.controls.start;
-    log("end", .{});
+}
+
+fn noodle(x: u32, y: u32, len: u32, state: bool) void {
+    if (y == 0)
+        log("noodle {},{} {}", .{ x, y, len });
+    if (!state) cart.rect(.{
+        .fill_color = .{ .r = 0, .g = 0, .b = 0 },
+        .x = @intCast(x),
+        .y = @intCast(cart.screen_height - y),
+        .width = 1 + len,
+        .height = 2,
+    });
 }
 
 fn set_background() void {
@@ -247,22 +252,42 @@ fn set_background() void {
             }
         },
         .paint => {
-            for (segments.segments) |segment| {
-                if (cart.controls.start)
-                    cart.rect(.{
-                        .fill_color = .{ .r = 0, .g = 0, .b = 0 },
-                        .x = 0,
-                        .y = 0,
-                        .width = cart.screen_width,
-                        .height = cart.screen_height,
-                    });
-                cart.rect(.{
-                    .fill_color = .{ .r = 0, .g = 0, .b = 0 },
-                    .x = @intCast(segment.start_x),
-                    .y = @intCast(cart.screen_height - segment.start_y),
-                    .width = 1 + segment.len,
-                    .height = 2,
-                });
+            // for (segments.segments) |segment| {
+            //     if (cart.controls.start)
+            //         cart.rect(.{
+            //             .fill_color = .{ .r = 0, .g = 0, .b = 0 },
+            //             .x = 0,
+            //             .y = 0,
+            //             .width = cart.screen_width,
+            //             .height = cart.screen_height,
+            //         });
+            //     cart.rect(.{
+            //         .fill_color = .{ .r = 0, .g = 0, .b = 0 },
+            //         .x = @intCast(segment.start_x),
+            //         .y = @intCast(cart.screen_height - segment.start_y),
+            //         .width = 1 + segment.len,
+            //         .height = 2,
+            //     });
+            // }
+            var state: bool = false;
+            var y: u32 = 0;
+            var x: u32 = 0;
+
+            for (segments.flips) |flip| {
+                var done: u32 = 0;
+                while (done < flip) {
+                    if (x + (flip - done) > cart.screen_width) {
+                        noodle(x, y, cart.screen_width - x, state);
+                        done += cart.screen_width - x;
+                        y += 1;
+                        x = 0;
+                    } else {
+                        noodle(x, y, flip, state);
+                        x += (flip - done);
+                        done = flip;
+                    }
+                }
+                state = !state;
             }
         },
     }
