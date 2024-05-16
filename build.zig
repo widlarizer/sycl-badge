@@ -82,7 +82,7 @@ pub fn build(b: *Build) void {
     {
         const cart = add_cart(&dep, b, .{
             .name = "fireworks",
-            .optimize = .ReleaseSmall,
+            .optimize = optimize,
             .root_source_file = .{ .path = "samples/blobs/fireworks.zig" },
         });
         cart.install(b);

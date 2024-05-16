@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const cart = @import("cart-api");
 const allocator = std.heap.c_allocator;
 
@@ -13,15 +14,13 @@ fn rand_mod(comptime T: type, max: T) T {
 
 export fn start() void {
     global.rand = std.rand.DefaultPrng.init(global.rand_seed);
+    scene_intro();
 }
 
 var scene: enum { intro, game } = .intro;
 
 export fn update() void {
-    switch (scene) {
-        .intro => scene_intro(),
-        .game => scene_game(),
-    }
+    scene_game();
 }
 
 const lines = &[_][]const u8{
@@ -39,15 +38,6 @@ fn scene_intro() void {
         .g = 0,
         .b = 0,
     });
-
-    if (ticks / 128 == 0) {
-        // Make the neopixel 24-bit color LEDs a nice Zig orange
-        @memset(cart.neopixels, .{
-            .r = 247,
-            .g = 164,
-            .b = 29,
-        });
-    }
 
     const y_start = (cart.screen_height - (cart.font_height + spacing * (lines.len - 1))) / 2;
 
@@ -91,6 +81,7 @@ fn spawn(t: Thingy) void {
     // Spawn sparkles
     var phi: f32 = 0.0;
     var sparkles_done: u32 = 0;
+    // const num_sparkles = 0;
     const num_sparkles = 10 + rand_mod(u32, 6);
 
     for (&thingies) |*sparkle| {
@@ -164,10 +155,10 @@ fn scene_game() void {
                 continue;
             }
             const margin = 10;
-            if (tick % 2 == 0) {
-                thingy.x = @intCast(@as(i16, @intCast(thingy.x)) + thingy.v_x);
-                thingy.y = @intCast(@as(i16, @intCast(thingy.y)) + thingy.v_y);
-                if (thingy.is_rocket and (thingy.x < margin or thingy.x > cart.screen_width - margin or thingy.y < margin or thingy.y > cart.screen_height - margin)) {
+            if (!builtin.target.isWasm() or tick % 2 == 0) {
+                thingy.x = @intCast(@as(i16, @intCast(thingy.x)) +| thingy.v_x);
+                thingy.y = @intCast(@as(i16, @intCast(thingy.y)) +| thingy.v_y);
+                if ((thingy.x < margin or thingy.x > cart.screen_width - margin or thingy.y < margin or thingy.y > cart.screen_height - margin)) {
                     end(thingy);
                 }
                 const g = 1;
@@ -180,7 +171,7 @@ fn scene_game() void {
 
     for (thingies) |thingy| {
         if (thingy.live) {
-            const size: u32 = if (thingy.is_rocket) 2 else 1;
+            const size: u32 = if (thingy.is_rocket) 5 else 1;
             cart.rect(.{
                 .stroke_color = thingy.color,
                 // .fill_color = color,
@@ -192,7 +183,7 @@ fn scene_game() void {
         }
     }
 
-    const improbability = 30;
+    const improbability = 5;
     if (tick % improbability == rand_mod(u32, improbability)) {
         launch();
     }
