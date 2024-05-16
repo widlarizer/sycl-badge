@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const cart = @import("cart-api");
+const segments = @import("segments.zig");
 const allocator = std.heap.c_allocator;
 
 const global = struct {
@@ -18,7 +19,8 @@ export fn start() void {
     scene_intro();
 }
 
-var scene: enum { intro, game } = .intro;
+var style: enum { normal, paint } = .normal;
+var prev_start: bool = false;
 
 export fn update() void {
     scene_game();
@@ -53,8 +55,6 @@ fn scene_intro() void {
     }
 
     if (ticks == 0) cart.red_led.* = !cart.red_led.*;
-    if (cart.controls.start) scene = .game;
-
     ticks +%= 4;
 }
 
@@ -128,7 +128,7 @@ fn spawn(t: Thingy) void {
             sparkle.y = t.y;
             sparkle.v_x = @intFromFloat(5 * @sin(phi));
             sparkle.v_y = @intFromFloat(5 * @cos(phi));
-            sparkle.ticks_to_live = 6 + @as(i8, @intCast(rand_mod(u32, 12)));
+            sparkle.ticks_to_live = 32 + @as(i8, @intCast(rand_mod(u32, 12)));
         }
     }
 }
@@ -195,7 +195,7 @@ fn scene_game() void {
     log("draw", .{});
     for (thingies) |thingy| {
         if (thingy.live) {
-            const size: u32 = if (thingy.is_rocket) 5 else 2;
+            const size: u32 = if (thingy.is_rocket) 5 else 3;
             cart.rect(.{
                 .fill_color = thingy.color,
                 .x = thingy.x,
@@ -219,22 +219,51 @@ fn scene_game() void {
         .g = 0,
         .b = 0,
     });
+    if (!prev_start and cart.controls.start) style = switch (style) {
+        .normal => .paint,
+        .paint => .normal,
+    };
+
+    prev_start = cart.controls.start;
     log("end", .{});
 }
 
 fn set_background() void {
-    const foo = @embedFile("foo.bmp");
-    var idx: u32 = 0x36; // bmp header
-    for (0..cart.screen_height) |y| {
-        for (0..cart.screen_width) |x| {
-            cart.rect(.{
-                .fill_color = if (foo[idx] == 0) .{ .r = 10, .g = 20, .b = 30 } else .{ .r = 0, .g = 0, .b = 0 },
-                .x = @intCast(x),
-                .y = @intCast(cart.screen_height - y),
-                .width = 2,
-                .height = 2,
-            });
-            idx += 3;
-        }
+    switch (style) {
+        .normal => {
+            const foo = @embedFile("foo.bmp");
+            var idx: u32 = 0x36; // bmp header
+            for (0..cart.screen_height) |y| {
+                for (0..cart.screen_width) |x| {
+                    cart.rect(.{
+                        .fill_color = if (foo[idx] == 0) .{ .r = 10, .g = 20, .b = 30 } else .{ .r = 0, .g = 0, .b = 0 },
+                        .x = @intCast(x),
+                        .y = @intCast(cart.screen_height - y),
+                        .width = 2,
+                        .height = 2,
+                    });
+                    idx += 3;
+                }
+            }
+        },
+        .paint => {
+            for (segments.segments) |segment| {
+                if (cart.controls.start)
+                    cart.rect(.{
+                        .fill_color = .{ .r = 0, .g = 0, .b = 0 },
+                        .x = 0,
+                        .y = 0,
+                        .width = cart.screen_width,
+                        .height = cart.screen_height,
+                    });
+                cart.rect(.{
+                    .fill_color = .{ .r = 0, .g = 0, .b = 0 },
+                    .x = @intCast(segment.start_x),
+                    .y = @intCast(cart.screen_height - segment.start_y),
+                    .width = 1 + segment.len,
+                    .height = 2,
+                });
+            }
+        },
     }
 }
