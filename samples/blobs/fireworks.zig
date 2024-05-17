@@ -22,7 +22,7 @@ export fn start() void {
     scene_intro();
 }
 
-var style: enum { normal, paint } = .normal;
+var style: enum { normal, paint } = .paint;
 var prev_start: bool = false;
 
 export fn update() void {
@@ -232,13 +232,21 @@ fn scene_game() void {
 }
 
 fn noodle(x: u32, y: u32, len: u32, state: bool) void {
-    if (!state) cart.rect(.{
-        .fill_color = .{ .r = 0, .g = 0, .b = 0 },
+    if (y < 13) log("y = {}, x = {}, len = {}, state = {}", .{ y, x, len, state });
+    const color: cart.DisplayColor = if (state) .{ .r = 0, .g = 0, .b = 0 } else .{ .r = 0, .g = 10, .b = 0 };
+    if (!state) cart.hline(.{
         .x = @intCast(x),
         .y = @intCast(cart.screen_height - y),
-        .width = 1 + len,
-        .height = 2,
+        .len = len,
+        .color = color,
     });
+    // cart.rect(.{
+    //     .stroke_color = color,
+    //     .x = @intCast(x),
+    //     .y = @intCast(cart.screen_height - y),
+    //     .width = len -| 1,
+    //     .height = 0,
+    // });
 }
 
 fn set_background() void {
@@ -277,7 +285,14 @@ fn set_background() void {
             //         .height = 2,
             //     });
             // }
-            var state: bool = false;
+            cart.rect(.{
+                .fill_color = .{ .r = 0, .g = 0, .b = 20 },
+                .x = 0,
+                .y = 0,
+                .width = cart.screen_width,
+                .height = cart.screen_height,
+            });
+            var state: bool = true;
             var y: u32 = 0;
             var x: u32 = 0;
 
@@ -286,17 +301,28 @@ fn set_background() void {
                 while (done < flip) {
                     if (x + (flip - done) > cart.screen_width) {
                         noodle(x, y, cart.screen_width - x, state);
+                        log("to end {},{}: {} of {}", .{ x, y, done, flip });
                         done += cart.screen_width - x;
                         y += 1;
                         x = 0;
                     } else {
                         noodle(x, y, flip, state);
+                        log("some {},{}: {} of {}", .{ x, y, done, flip });
                         x += (flip - done);
                         done = flip;
                     }
                 }
                 state = !state;
             }
+            // Dim
+            // if (ticks % 2 == 0) {
+            //     // {
+            //     for (cart.framebuffer) |*col| {
+            //         col.r = @intCast((@as(u32, @intCast(col.r)) * 101) / 100);
+            //         col.g = @intCast((@as(u32, @intCast(col.g)) * 101) / 100);
+            //         col.b = @intCast((@as(u32, @intCast(col.b)) * 101) / 100);
+            //     }
+            // }
         },
     }
 }
